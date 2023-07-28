@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"github.com/csmith/envflag"
@@ -8,6 +10,10 @@ import (
 	"github.com/greboid/dsp/internal"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 )
 
 var (
@@ -23,8 +29,25 @@ func main() {
 	router.Post("/containers/{id}/kill", p.ContainerKill)
 	router.Post("/*", p.AccessDenied)
 	router.Get("/*", p.PassToSocket)
-	if err := http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", *proxyPort), router); err != http.ErrServerClosed {
-		log.Fatalf("Failed to serve http: %v", err)
-		return
+	server := &http.Server{
+		Addr:    fmt.Sprintf("0.0.0.0:%d", *proxyPort),
+		Handler: router,
 	}
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 2*time.Second)
+	defer shutdownRelease()
+
+	go func() {
+		log.Printf("Starting: http://0.0.0.0:%d", *proxyPort)
+		if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("Error serving: %v", err)
+		}
+	}()
+
+	<-sigChan
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Fatalf("Shutdown error: %v", err)
+	}
+	log.Println("Exiting")
 }
