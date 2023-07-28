@@ -1,0 +1,7 @@
+=== Docker Socket Proxy
+
+It is intended to be as simple as possible to allow a proxy to serve containers without needing full access to the
+docker socket.
+
+Exposes the docker socket on disk, over http (defaults to 8080).  The only changes that can be made are a set of
+kill signals to individual containers, defaults to just HUP.
