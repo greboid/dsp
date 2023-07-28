@@ -8,7 +8,7 @@ import (
 	"github.com/csmith/envflag"
 	"github.com/go-chi/chi/v5"
 	"github.com/greboid/dsp/internal"
-	"log"
+	"golang.org/x/exp/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -24,7 +24,12 @@ var (
 
 func main() {
 	envflag.Parse()
-	p := internal.NewProxy(*permissibleKillSignals, *realSock)
+	var p *internal.Proxy
+	var err error
+	if p, err = internal.NewProxy(*permissibleKillSignals, *realSock); err != nil {
+		slog.Error("socket does not exist", "socket", *realSock)
+		return
+	}
 	router := chi.NewRouter()
 	router.Post("/containers/{id}/kill", p.ContainerKill)
 	router.Post("/*", p.AccessDenied)
@@ -38,16 +43,19 @@ func main() {
 	shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 2*time.Second)
 	defer shutdownRelease()
 
-	go func() {
-		log.Printf("Starting: http://0.0.0.0:%d", *proxyPort)
-		if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("Error serving: %v", err)
-		}
-	}()
+	go runServer(server, sigChan)
 
 	<-sigChan
-	if err := server.Shutdown(shutdownCtx); err != nil {
-		log.Fatalf("Shutdown error: %v", err)
+	if err = server.Shutdown(shutdownCtx); err != nil {
+		slog.Error("Shutdown error", "error", err)
 	}
-	log.Println("Exiting")
+	slog.Info("Exiting")
+}
+
+func runServer(server *http.Server, c chan os.Signal) {
+	slog.Info("Starting server", "url", fmt.Sprintf("http://0.0.0.0:%d", *proxyPort))
+	if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+		slog.Error("Server error", "error", err)
+		c <- syscall.SIGINT
+	}
 }
