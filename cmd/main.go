@@ -32,6 +32,7 @@ func main() {
 	}
 	router := chi.NewRouter()
 	router.Post("/containers/{id}/kill", p.ContainerKill)
+	router.Post("/{apiversion}/containers/{id}/kill", p.ContainerKill)
 	router.Post("/*", p.AccessDenied)
 	router.Get("/*", p.PassToSocket)
 	server := &http.Server{
