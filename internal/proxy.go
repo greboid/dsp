@@ -56,7 +56,7 @@ func (p *Proxy) ContainerKill(writer http.ResponseWriter, request *http.Request)
 }
 
 func (p *Proxy) AccessDenied(writer http.ResponseWriter, request *http.Request) {
-	slog.Error("Access denied", "path", "url", request.URL)
+	slog.Error("Access denied", "url", request.URL)
 	_ = json.NewEncoder(writer).Encode(struct {
 		Message string `json:"message"`
 	}{"Access Denied"})
