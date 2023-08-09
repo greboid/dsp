@@ -49,7 +49,7 @@ func (p *Proxy) ContainerKill(writer http.ResponseWriter, request *http.Request)
 		p.rp.ServeHTTP(writer, request)
 		return
 	}
-	slog.Error("Kill not allowed", "path", "url", request.URL)
+	slog.Error("Kill not allowed", "url", request.URL)
 	_ = json.NewEncoder(writer).Encode(struct {
 		Message string `json:"message"`
 	}{"Access Denied"})
