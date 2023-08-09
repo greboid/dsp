@@ -4,7 +4,7 @@ import (
 	"flag"
 	"github.com/csmith/envflag"
 	"github.com/greboid/dsp/internal"
-	"golang.org/x/exp/slog"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"

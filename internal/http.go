@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/go-chi/chi/v5"
-	"golang.org/x/exp/slog"
+	"log/slog"
 	"net/http"
 	"os"
 	"syscall"

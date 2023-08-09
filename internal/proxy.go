@@ -4,13 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"golang.org/x/exp/slices"
-	"golang.org/x/exp/slog"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"os"
 	"regexp"
+	"slices"
 	"time"
 )
 
