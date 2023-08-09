@@ -1,4 +1,4 @@
-FROM ghcr.io/greboid/dockerfiles/golang:latest as builder
+FROM index.docker.io/golang:1.21 as builder
 
 WORKDIR /app
 COPY go.mod go.sum /app/
