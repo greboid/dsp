@@ -27,8 +27,11 @@ func NewServer(p *Proxy, port int, signal chan os.Signal) (*Server, error) {
 	}
 	r := s.createRouter(p)
 	s.httpServer = &http.Server{
-		Addr:    fmt.Sprintf("0.0.0.0:%d", port),
-		Handler: r,
+		Addr:         fmt.Sprintf("0.0.0.0:%d", port),
+		Handler:      r,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  180 * time.Second,
 	}
 	return s, nil
 }
