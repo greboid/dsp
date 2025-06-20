@@ -1,7 +1,30 @@
-=== Docker Socket Proxy
+= Docker Socket Proxy
 
-It is intended to be as simple as possible to allow a proxy to serve containers without needing full access to the
-docker socket.
+It is intended to be as simple as possible to allow a proxy to serve container without needing full access to the
+docker socket by exposing the docker socket (unix socket) via HTTP
 
-Exposes the docker socket on disk, over http (defaults to 8080).  The only changes that can be made are a set of
-kill signals to individual containers, defaults to just HUP.
+== Allowed endpoints
+- `POST /containers/+{id}+/kill`: Allowed only with permitted signals
+- `POST /`: Other POST requests are denied
+- `GET /`: All GET requests are allowed
+
+== Configuration Options
+
+The application accepts the following command-line flags, which can also be set via environment variables:
+
+- `-socket` (default: `/var/run/docker.sock`): Path to the Docker socket
+- `-proxyPort` (default: `8080`): Port for the proxy to listen on
+- `-killSignals` (default: `HUP`): Space-separated list of permissible kill signals
+
+Environment variables: `SOCKET`, `PROXYPORT`, `KILLSIGNALS`
+
+== Logging Options
+
+The following logging configuration options:
+
+- `-log-format` (default: `text`): Log format, either `text` or `json`
+- `-log-level` (default: `info`): Minimum log level to output (`debug`, `info`, `warn`, `error`)
+- `-log-time` (default: `false`): Whether to include timestamps in logs
+- `-log-source` (default: `false`): Whether to include source file and line information in logs
+
+Environment variables: `LOG_FORMAT`, `LOG_LEVEL`, `LOG_TIME`, `LOG_SOURCE`
