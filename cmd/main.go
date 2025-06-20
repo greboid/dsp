@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"github.com/csmith/envflag/v2"
 	"github.com/csmith/slogflags"
@@ -26,8 +27,11 @@ func main() {
 
 	shutdownSignal := make(chan os.Signal, 1)
 	signal.Notify(shutdownSignal, syscall.SIGINT, syscall.SIGTERM)
-
-	if p, err = internal.NewProxy(*permissibleKillSignals, *realSock); err != nil {
+	if _, err := os.Stat(*realSock); errors.Is(err, os.ErrNotExist) {
+		slog.Error("socket does not exist", "socket", *realSock)
+		return
+	}
+	if p, err = internal.NewProxy(*permissibleKillSignals, *realSock, nil); err != nil {
 		slog.Error("socket does not exist", "socket", *realSock)
 		return
 	}
