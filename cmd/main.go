@@ -2,7 +2,8 @@ package main
 
 import (
 	"flag"
-	"github.com/csmith/envflag"
+	"github.com/csmith/envflag/v2"
+	"github.com/csmith/slogflags"
 	"github.com/greboid/dsp/internal"
 	"log/slog"
 	"os"
@@ -18,6 +19,7 @@ var (
 
 func main() {
 	envflag.Parse()
+	slogflags.Logger(slogflags.WithSetDefault(true))
 	var p *internal.Proxy
 	var s *internal.Server
 	var err error
