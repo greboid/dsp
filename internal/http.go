@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/go-chi/chi/v5"
 	"log/slog"
 	"net/http"
 	"os"
@@ -36,12 +35,12 @@ func NewServer(p *Proxy, port int, signal chan os.Signal) (*Server, error) {
 	return s, nil
 }
 
-func (s *Server) createRouter(p *Proxy) *chi.Mux {
-	router := chi.NewRouter()
-	router.Post("/containers/{id}/kill", p.ContainerKill)
-	router.Post("/{apiversion}/containers/{id}/kill", p.ContainerKill)
-	router.Post("/*", p.AccessDenied)
-	router.Get("/*", p.PassToSocket)
+func (s *Server) createRouter(p *Proxy) *http.ServeMux {
+	router := http.NewServeMux()
+	router.HandleFunc("POST /containers/{id}/kill", p.ContainerKill)
+	router.HandleFunc("POST /{apiversion}/containers/{id}/kill", p.ContainerKill)
+	router.HandleFunc("POST /", p.AccessDenied)
+	router.HandleFunc("GET /", p.PassToSocket)
 	return router
 }
 
