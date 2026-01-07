@@ -67,8 +67,8 @@ func (p *Proxy) PassToSocket(writer http.ResponseWriter, request *http.Request) 
 	p.rp.ServeHTTP(writer, request)
 }
 
-func (p *Proxy) Events(writer http.ResponseWriter, request *http.Request) {
-	slog.Debug("Events stream", "url", request.URL)
+func (p *Proxy) streamWithoutTimeout(writer http.ResponseWriter, request *http.Request, logMessage string) {
+	slog.Debug(logMessage, "url", request.URL)
 	rc := http.NewResponseController(writer)
 	if err := rc.SetReadDeadline(time.Time{}); err != nil {
 		slog.Error("Failed to set read deadline", "error", err)
@@ -77,40 +77,20 @@ func (p *Proxy) Events(writer http.ResponseWriter, request *http.Request) {
 		slog.Error("Failed to set write deadline", "error", err)
 	}
 	p.rp.ServeHTTP(writer, request)
+}
+
+func (p *Proxy) Events(writer http.ResponseWriter, request *http.Request) {
+	p.streamWithoutTimeout(writer, request, "Events stream")
 }
 
 func (p *Proxy) Stats(writer http.ResponseWriter, request *http.Request) {
-	slog.Debug("Stats stream", "url", request.URL)
-	rc := http.NewResponseController(writer)
-	if err := rc.SetReadDeadline(time.Time{}); err != nil {
-		slog.Error("Failed to set read deadline", "error", err)
-	}
-	if err := rc.SetWriteDeadline(time.Time{}); err != nil {
-		slog.Error("Failed to set write deadline", "error", err)
-	}
-	p.rp.ServeHTTP(writer, request)
+	p.streamWithoutTimeout(writer, request, "Stats stream")
 }
 
 func (p *Proxy) Logs(writer http.ResponseWriter, request *http.Request) {
-	slog.Debug("Logs stream", "url", request.URL)
-	rc := http.NewResponseController(writer)
-	if err := rc.SetReadDeadline(time.Time{}); err != nil {
-		slog.Error("Failed to set read deadline", "error", err)
-	}
-	if err := rc.SetWriteDeadline(time.Time{}); err != nil {
-		slog.Error("Failed to set write deadline", "error", err)
-	}
-	p.rp.ServeHTTP(writer, request)
+	p.streamWithoutTimeout(writer, request, "Logs stream")
 }
 
 func (p *Proxy) Attach(writer http.ResponseWriter, request *http.Request) {
-	slog.Debug("Attach stream", "url", request.URL)
-	rc := http.NewResponseController(writer)
-	if err := rc.SetReadDeadline(time.Time{}); err != nil {
-		slog.Error("Failed to set read deadline", "error", err)
-	}
-	if err := rc.SetWriteDeadline(time.Time{}); err != nil {
-		slog.Error("Failed to set write deadline", "error", err)
-	}
-	p.rp.ServeHTTP(writer, request)
+	p.streamWithoutTimeout(writer, request, "Attach stream")
 }
