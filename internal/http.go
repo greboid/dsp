@@ -39,6 +39,8 @@ func (s *Server) createRouter(p *Proxy) *http.ServeMux {
 	router := http.NewServeMux()
 	router.HandleFunc("POST /containers/{id}/kill", p.ContainerKill)
 	router.HandleFunc("POST /{apiversion}/containers/{id}/kill", p.ContainerKill)
+	router.HandleFunc("GET /events", p.Events)
+	router.HandleFunc("GET /{apiversion}/events", p.Events)
 	router.HandleFunc("POST /", p.AccessDenied)
 	router.HandleFunc("GET /", p.PassToSocket)
 	return router
