@@ -41,6 +41,12 @@ func (s *Server) createRouter(p *Proxy) *http.ServeMux {
 	router.HandleFunc("POST /{apiversion}/containers/{id}/kill", p.ContainerKill)
 	router.HandleFunc("GET /events", p.Events)
 	router.HandleFunc("GET /{apiversion}/events", p.Events)
+	router.HandleFunc("GET /containers/{id}/stats", p.Stats)
+	router.HandleFunc("GET /{apiversion}/containers/{id}/stats", p.Stats)
+	router.HandleFunc("GET /containers/{id}/logs", p.Logs)
+	router.HandleFunc("GET /{apiversion}/containers/{id}/logs", p.Logs)
+	router.HandleFunc("POST /containers/{id}/attach", p.Attach)
+	router.HandleFunc("POST /{apiversion}/containers/{id}/attach", p.Attach)
 	router.HandleFunc("POST /", p.AccessDenied)
 	router.HandleFunc("GET /", p.PassToSocket)
 	return router
