@@ -24,7 +24,12 @@ jobs:
       - uses: actions/toolkit/docker-login@master
         with:
           audience: u:1:e7c48982-76d3-4d0e-8dd3-95729d0eb9c5
-      - uses: actions/toolkit/docker-build@master
+          ghcr: ${{ secrets.MIRROR_TOKEN }}
+      - name: Build and push image
+        uses: actions/toolkit/docker-push@master
+        with:
+          file: Containerfile
+          ghcr: true
   release:
     if: github.ref_type == 'tag'
     runs-on: alpine
@@ -36,4 +41,9 @@ jobs:
       - uses: actions/toolkit/docker-login@master
         with:
           audience: u:1:e7c48982-76d3-4d0e-8dd3-95729d0eb9c5
-      - uses: actions/toolkit/docker-build@master
+          ghcr: ${{ secrets.MIRROR_TOKEN }}
+      - name: Build and push image
+        uses: actions/toolkit/docker-push@master
+        with:
+          file: Containerfile
+          ghcr: true
