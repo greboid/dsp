@@ -47,6 +47,8 @@ func (s *Server) createRouter(p *Proxy) *http.ServeMux {
 	router.HandleFunc("GET /{apiversion}/containers/{id}/logs", p.Logs)
 	router.HandleFunc("POST /containers/{id}/attach", p.Attach)
 	router.HandleFunc("POST /{apiversion}/containers/{id}/attach", p.Attach)
+	router.HandleFunc("POST /images/create", p.ImagesCreate)
+	router.HandleFunc("POST /{apiversion}/images/create", p.ImagesCreate)
 	router.HandleFunc("POST /", p.AccessDenied)
 	router.HandleFunc("GET /", p.PassToSocket)
 	return router

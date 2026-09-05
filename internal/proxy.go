@@ -14,10 +14,11 @@ import (
 
 type Proxy struct {
 	killSignals []string
+	allowPulls  bool
 	rp          *httputil.ReverseProxy
 }
 
-func NewProxy(permissibleKillSignals string, realSock string, transport *http.Transport) (*Proxy, error) {
+func NewProxy(permissibleKillSignals string, allowPulls bool, realSock string, transport *http.Transport) (*Proxy, error) {
 	d := net.Dialer{
 		Timeout: 5 * time.Second,
 	}
@@ -30,6 +31,7 @@ func NewProxy(permissibleKillSignals string, realSock string, transport *http.Tr
 	}
 	return &Proxy{
 		killSignals: regexp.MustCompile("\\S+").FindAllString(permissibleKillSignals, -1),
+		allowPulls:  allowPulls,
 		rp: &httputil.ReverseProxy{
 			Director: func(request *http.Request) {
 				request.URL.Scheme = "http"
@@ -52,6 +54,14 @@ func (p *Proxy) ContainerKill(writer http.ResponseWriter, request *http.Request)
 	_ = json.NewEncoder(writer).Encode(struct {
 		Message string `json:"message"`
 	}{"Access Denied"})
+}
+
+func (p *Proxy) ImagesCreate(writer http.ResponseWriter, request *http.Request) {
+	if p.allowPulls {
+		p.streamWithoutTimeout(writer, request, "Image pull")
+		return
+	}
+	p.AccessDenied(writer, request)
 }
 
 func (p *Proxy) AccessDenied(writer http.ResponseWriter, request *http.Request) {

@@ -16,6 +16,7 @@ var (
 	realSock               = flag.String("socket", "/var/run/docker.sock", "Docket socket")
 	proxyPort              = flag.Int("proxyPort", 8080, "Proxy port")
 	permissibleKillSignals = flag.String("killSignals", "HUP", "Comma separated list of permissible kill signals, if blank all are allowed")
+	allowPulls             = flag.Bool("allowPulls", false, "Allow pulling images (POST /images/create)")
 )
 
 func main() {
@@ -31,7 +32,7 @@ func main() {
 		slog.Error("socket does not exist", "socket", *realSock)
 		return
 	}
-	if p, err = internal.NewProxy(*permissibleKillSignals, *realSock, nil); err != nil {
+	if p, err = internal.NewProxy(*permissibleKillSignals, *allowPulls, *realSock, nil); err != nil {
 		slog.Error("socket does not exist", "socket", *realSock)
 		return
 	}
