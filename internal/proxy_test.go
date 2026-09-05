@@ -29,7 +29,7 @@ func TestNewProxy_Success(t *testing.T) {
 	})
 	defer server.Close()
 	transport := createTestTransport(server)
-	proxy, err := NewProxy("HUP TERM", "/mock/socket", transport)
+	proxy, err := NewProxy("HUP TERM", false, "/mock/socket", transport)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, proxy)
@@ -46,7 +46,7 @@ func TestProxy_ContainerKill_AllowedSignal(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 	defer server.Close()
-	proxy, err := NewProxy("HUP TERM", "/mock/socket", createTestTransport(server))
+	proxy, err := NewProxy("HUP TERM", false, "/mock/socket", createTestTransport(server))
 	require.NoError(t, err)
 
 	w := httptest.NewRecorder()
@@ -61,7 +61,7 @@ func TestProxy_ContainerKill_DisallowedSignal(t *testing.T) {
 		t.Error("Server handler was called, but the request should have been denied")
 	})
 	defer server.Close()
-	proxy, err := NewProxy("HUP", "/mock/socket", createTestTransport(server))
+	proxy, err := NewProxy("HUP", false, "/mock/socket", createTestTransport(server))
 	require.NoError(t, err)
 
 	w := httptest.NewRecorder()
@@ -83,7 +83,7 @@ func TestProxy_AccessDenied(t *testing.T) {
 	})
 	defer server.Close()
 
-	proxy, err := NewProxy("HUP", "/mock/socket", createTestTransport(server))
+	proxy, err := NewProxy("HUP", false, "/mock/socket", createTestTransport(server))
 	require.NoError(t, err)
 
 	w := httptest.NewRecorder()
@@ -108,7 +108,7 @@ func TestProxy_PassToSocket(t *testing.T) {
 	})
 	defer server.Close()
 
-	proxy, err := NewProxy("HUP", "/mock/socket", createTestTransport(server))
+	proxy, err := NewProxy("HUP", false, "/mock/socket", createTestTransport(server))
 	require.NoError(t, err)
 
 	w := httptest.NewRecorder()
@@ -117,4 +117,44 @@ func TestProxy_PassToSocket(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, "success", w.Body.String())
+}
+
+func TestProxy_ImagesCreate_Allowed(t *testing.T) {
+	server := setupTestServer(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "POST", r.Method)
+		assert.Equal(t, "/images/create", r.URL.Path)
+		assert.Equal(t, "alpine", r.URL.Query().Get("fromImage"))
+		w.WriteHeader(http.StatusOK)
+	})
+	defer server.Close()
+	proxy, err := NewProxy("HUP", true, "/mock/socket", createTestTransport(server))
+	require.NoError(t, err)
+
+	w := httptest.NewRecorder()
+
+	proxy.ImagesCreate(w, httptest.NewRequest("POST", "/images/create?fromImage=alpine", nil))
+
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestProxy_ImagesCreate_Disallowed(t *testing.T) {
+	server := setupTestServer(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("Server handler was called, but pulls should have been denied")
+	})
+	defer server.Close()
+	proxy, err := NewProxy("HUP", false, "/mock/socket", createTestTransport(server))
+	require.NoError(t, err)
+
+	w := httptest.NewRecorder()
+
+	proxy.ImagesCreate(w, httptest.NewRequest("POST", "/images/create?fromImage=alpine", nil))
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+
+	var response struct {
+		Message string `json:"message"`
+	}
+	err = json.NewDecoder(w.Body).Decode(&response)
+	require.NoError(t, err)
+	assert.Equal(t, "Access Denied", response.Message)
 }

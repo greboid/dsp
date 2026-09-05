@@ -5,6 +5,7 @@ docker socket by exposing the docker socket (unix socket) via HTTP
 
 == Allowed endpoints
 - `POST /containers/+{id}+/kill`: Allowed only with permitted signals
+- `POST /images/create`: Allowed only if `-allowPulls` is enabled
 - `POST /`: Other POST requests are denied
 - `GET /`: All GET requests are allowed
 
@@ -15,8 +16,9 @@ The application accepts the following command-line flags, which can also be set 
 - `-socket` (default: `/var/run/docker.sock`): Path to the Docker socket
 - `-proxyPort` (default: `8080`): Port for the proxy to listen on
 - `-killSignals` (default: `HUP`): Space-separated list of permissible kill signals
+- `-allowPulls` (default: `false`): Allow pulling images via `POST /images/create`
 
-Environment variables: `SOCKET`, `PROXYPORT`, `KILLSIGNALS`
+Environment variables: `SOCKET`, `PROXYPORT`, `KILLSIGNALS`, `ALLOWPULLS`
 
 == Logging Options
 
