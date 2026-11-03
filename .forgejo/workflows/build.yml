@@ -29,4 +29,5 @@ jobs:
         uses: actions/toolkit/docker-push@master
         with:
           ghcr: true
+          platforms: linux/amd64,linux/arm64
 
