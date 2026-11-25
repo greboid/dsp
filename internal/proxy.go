@@ -7,65 +7,71 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
-	"regexp"
 	"slices"
+	"strings"
 	"time"
 )
 
+type Options struct {
+	// KillSignals is a whitespace separated list of signals permitted for container kill.
+	KillSignals string
+	AllowPulls  bool
+	AllowPrune  bool
+	AllowExec   bool
+	AllowCreate bool
+	AllowAll    bool
+}
+
 type Proxy struct {
+	Options
 	killSignals []string
-	allowPulls  bool
 	rp          *httputil.ReverseProxy
 }
 
-func NewProxy(permissibleKillSignals string, allowPulls bool, realSock string, transport *http.Transport) (*Proxy, error) {
-	d := net.Dialer{
-		Timeout: 5 * time.Second,
-	}
+// NewProxy creates a proxy to the docker socket at realSock; transport overrides the socket connection if not nil.
+func NewProxy(opts Options, realSock string, transport http.RoundTripper) *Proxy {
 	if transport == nil {
+		d := net.Dialer{Timeout: 5 * time.Second}
 		transport = &http.Transport{
-			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				return d.DialContext(context.Background(), "unix", realSock)
+			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+				return d.DialContext(ctx, "unix", realSock)
 			},
 		}
 	}
 	return &Proxy{
-		killSignals: regexp.MustCompile("\\S+").FindAllString(permissibleKillSignals, -1),
-		allowPulls:  allowPulls,
+		Options:     opts,
+		killSignals: strings.Fields(opts.KillSignals),
 		rp: &httputil.ReverseProxy{
-			Director: func(request *http.Request) {
-				request.URL.Scheme = "http"
-				request.URL.Host = "localhost"
+			Rewrite: func(r *httputil.ProxyRequest) {
+				r.Out.URL.Scheme = "http"
+				r.Out.URL.Host = "localhost"
 			},
 			Transport: transport,
 		},
-	}, nil
+	}
 }
 
 func (p *Proxy) ContainerKill(writer http.ResponseWriter, request *http.Request) {
 	signal := request.URL.Query().Get("signal")
-	if len(p.killSignals) > 0 && slices.Contains(p.killSignals, signal) {
+	if p.AllowAll || slices.Contains(p.killSignals, signal) {
 		slog.Debug("Kill allowed", "url", request.URL, "signal", signal)
 		p.rp.ServeHTTP(writer, request)
-		return
-	}
-	slog.Error("Kill not allowed", "url", request.URL)
-	writer.WriteHeader(http.StatusForbidden)
-	_ = json.NewEncoder(writer).Encode(struct {
-		Message string `json:"message"`
-	}{"Access Denied"})
-}
-
-func (p *Proxy) ImagesCreate(writer http.ResponseWriter, request *http.Request) {
-	if p.allowPulls {
-		p.streamWithoutTimeout(writer, request, "Image pull")
 		return
 	}
 	p.AccessDenied(writer, request)
 }
 
+// Guard returns a handler that streams the request to the socket if allowed (or AllowAll is set), otherwise denies it.
+func (p *Proxy) Guard(allowed bool) http.HandlerFunc {
+	if allowed || p.AllowAll {
+		return p.Stream
+	}
+	return p.AccessDenied
+}
+
 func (p *Proxy) AccessDenied(writer http.ResponseWriter, request *http.Request) {
-	slog.Error("Access denied", "url", request.URL)
+	slog.Error("Access denied", "method", request.Method, "url", request.URL)
+	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusForbidden)
 	_ = json.NewEncoder(writer).Encode(struct {
 		Message string `json:"message"`
@@ -73,12 +79,13 @@ func (p *Proxy) AccessDenied(writer http.ResponseWriter, request *http.Request) 
 }
 
 func (p *Proxy) PassToSocket(writer http.ResponseWriter, request *http.Request) {
-	slog.Debug("Passing to socket", "url", request.URL)
+	slog.Debug("Passing to socket", "method", request.Method, "url", request.URL)
 	p.rp.ServeHTTP(writer, request)
 }
 
-func (p *Proxy) streamWithoutTimeout(writer http.ResponseWriter, request *http.Request, logMessage string) {
-	slog.Debug(logMessage, "url", request.URL)
+// Stream forwards the request with the server read and write timeouts removed, for long-running requests.
+func (p *Proxy) Stream(writer http.ResponseWriter, request *http.Request) {
+	slog.Debug("Streaming to socket", "method", request.Method, "url", request.URL)
 	rc := http.NewResponseController(writer)
 	if err := rc.SetReadDeadline(time.Time{}); err != nil {
 		slog.Error("Failed to set read deadline", "error", err)
@@ -87,20 +94,4 @@ func (p *Proxy) streamWithoutTimeout(writer http.ResponseWriter, request *http.R
 		slog.Error("Failed to set write deadline", "error", err)
 	}
 	p.rp.ServeHTTP(writer, request)
-}
-
-func (p *Proxy) Events(writer http.ResponseWriter, request *http.Request) {
-	p.streamWithoutTimeout(writer, request, "Events stream")
-}
-
-func (p *Proxy) Stats(writer http.ResponseWriter, request *http.Request) {
-	p.streamWithoutTimeout(writer, request, "Stats stream")
-}
-
-func (p *Proxy) Logs(writer http.ResponseWriter, request *http.Request) {
-	p.streamWithoutTimeout(writer, request, "Logs stream")
-}
-
-func (p *Proxy) Attach(writer http.ResponseWriter, request *http.Request) {
-	p.streamWithoutTimeout(writer, request, "Attach stream")
 }

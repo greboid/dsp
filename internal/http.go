@@ -6,68 +6,78 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"os"
-	"syscall"
 	"time"
 )
 
 type Server struct {
-	p          *Proxy
-	port       int
 	httpServer *http.Server
-	signal     chan os.Signal
 }
 
-func NewServer(p *Proxy, port int, signal chan os.Signal) (*Server, error) {
-	s := &Server{
-		p:      p,
-		port:   port,
-		signal: signal,
+func NewServer(p *Proxy, port int) *Server {
+	return &Server{
+		httpServer: &http.Server{
+			Addr:              fmt.Sprintf("0.0.0.0:%d", port),
+			Handler:           newRouter(p),
+			ReadHeaderTimeout: 10 * time.Second,
+			ReadTimeout:       30 * time.Second,
+			WriteTimeout:      30 * time.Second,
+			IdleTimeout:       180 * time.Second,
+		},
 	}
-	r := s.createRouter(p)
-	s.httpServer = &http.Server{
-		Addr:         fmt.Sprintf("0.0.0.0:%d", port),
-		Handler:      r,
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 30 * time.Second,
-		IdleTimeout:  180 * time.Second,
-	}
-	return s, nil
 }
 
-func (s *Server) createRouter(p *Proxy) *http.ServeMux {
+func newRouter(p *Proxy) *http.ServeMux {
 	router := http.NewServeMux()
-	router.HandleFunc("POST /containers/{id}/kill", p.ContainerKill)
-	router.HandleFunc("POST /{apiversion}/containers/{id}/kill", p.ContainerKill)
-	router.HandleFunc("GET /events", p.Events)
-	router.HandleFunc("GET /{apiversion}/events", p.Events)
-	router.HandleFunc("GET /containers/{id}/stats", p.Stats)
-	router.HandleFunc("GET /{apiversion}/containers/{id}/stats", p.Stats)
-	router.HandleFunc("GET /containers/{id}/logs", p.Logs)
-	router.HandleFunc("GET /{apiversion}/containers/{id}/logs", p.Logs)
-	router.HandleFunc("POST /containers/{id}/attach", p.Attach)
-	router.HandleFunc("POST /{apiversion}/containers/{id}/attach", p.Attach)
-	router.HandleFunc("POST /images/create", p.ImagesCreate)
-	router.HandleFunc("POST /{apiversion}/images/create", p.ImagesCreate)
-	router.HandleFunc("POST /", p.AccessDenied)
+	if p.AllowAll {
+		router.HandleFunc("/", p.Stream)
+		return router
+	}
+	// ServeMux has no optional segments, so each route is registered with and without the API version prefix.
+	handle := func(method, path string, h http.HandlerFunc) {
+		router.HandleFunc(method+" "+path, h)
+		router.HandleFunc(method+" /{apiversion}"+path, h)
+	}
+	handle("POST", "/containers/{id}/kill", p.ContainerKill)
+	handle("GET", "/events", p.Stream)
+	handle("GET", "/containers/{id}/stats", p.Stream)
+	handle("GET", "/containers/{id}/logs", p.Stream)
+	handle("GET", "/containers/{id}/archive", p.Stream)
+	handle("POST", "/images/create", p.Guard(p.AllowPulls))
+	for _, kind := range []string{"containers", "images", "networks", "volumes", "build"} {
+		handle("POST", "/"+kind+"/prune", p.Guard(p.AllowPrune))
+	}
+	for _, path := range []string{"/containers/{id}/attach", "/containers/{id}/exec", "/exec/{id}/start", "/exec/{id}/resize"} {
+		handle("POST", path, p.Guard(p.AllowExec))
+	}
+	for _, path := range []string{"/containers/create", "/containers/{id}/start", "/containers/{id}/wait"} {
+		handle("POST", path, p.Guard(p.AllowCreate))
+	}
+	handle("DELETE", "/containers/{id}", p.Guard(p.AllowCreate))
 	router.HandleFunc("GET /", p.PassToSocket)
+	// Any other method or path (POST, PUT, DELETE, ...) is denied.
+	router.HandleFunc("/", p.AccessDenied)
 	return router
 }
 
-func (s *Server) Shutdown() {
-	shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 2*time.Second)
-	defer shutdownRelease()
-	if err := s.httpServer.Shutdown(shutdownCtx); err != nil {
-		slog.Error("Shutdown error", "error", err)
-	}
-}
-
-func (s *Server) Start() {
+// Run serves until ctx is cancelled, then shuts down gracefully.
+func (s *Server) Run(ctx context.Context) error {
+	errCh := make(chan error, 1)
 	go func() {
-		slog.Info("Starting server", "url", fmt.Sprintf("http://0.0.0.0:%d", s.port))
-		if err := s.httpServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-			slog.Error("Server error", "error", err)
-			s.signal <- syscall.SIGINT
-		}
+		slog.Info("Starting server", "addr", s.httpServer.Addr)
+		errCh <- s.httpServer.ListenAndServe()
 	}()
+	select {
+	case err := <-errCh:
+		return err
+	case <-ctx.Done():
+	}
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := s.httpServer.Shutdown(shutdownCtx); err != nil {
+		return err
+	}
+	if err := <-errCh; !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+	return nil
 }
