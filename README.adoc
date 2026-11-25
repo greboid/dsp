@@ -7,55 +7,69 @@ docker socket by exposing the docker socket (unix socket) via HTTP
 
 The application accepts the following command-line flags, which can also be set via environment variables:
 
-[cols="~m,~m,~m,40"]
-|===
-|Flag |Env var |Default |Description
+`-socket` / `SOCKET` (default: `/var/run/docker.sock`)::
+Path to the Docker socket
 
-|-socket |SOCKET |/var/run/docker.sock |Path to the Docker socket
-|-proxyPort |PROXYPORT |8080 |Port for the proxy to listen on
-|-killSignals |KILLSIGNALS |HUP |Space-separated list of permissible kill signals, if blank none are allowed
-|-allowPulls |ALLOWPULLS |false |Allow pulling images
-|-allowPrune |ALLOWPRUNE |false |Allow pruning containers, images, networks, volumes and build cache
-|-allowExec |ALLOWEXEC |false |Allow running commands in and attaching to containers +
+`-proxyPort` / `PROXYPORT` (default: `8080`)::
+Port for the proxy to listen on
+
+`-killSignals` / `KILLSIGNALS` (default: `HUP`)::
+Space-separated list of permissible kill signals, if blank none are allowed
+
+`-allowPulls` / `ALLOWPULLS` (default: `false`)::
+Allow pulling images
+
+`-allowPrune` / `ALLOWPRUNE` (default: `false`)::
+Allow pruning containers, images, networks, volumes and build cache
+
+`-allowExec` / `ALLOWEXEC` (default: `false`)::
+Allow running commands in and attaching to containers +
 *Warning:* permits running any command in any container and writing to container stdin via attach
-|-allowCreate |ALLOWCREATE |false |Allow creating, starting, waiting on and deleting containers +
+
+`-allowCreate` / `ALLOWCREATE` (default: `false`)::
+Allow creating, starting, waiting on and deleting containers +
 *Warning:* permits creating containers with any mounts or privileges, which is equivalent to root on the host
-|-allowAll |ALLOWALL |false |Allow all requests +
+
+`-allowAll` / `ALLOWALL` (default: `false`)::
+Allow all requests +
 *Warning:* passes every request to the socket and disables all other checks
-|===
 
 == Logging Options
 
-[cols="~m,~m,~m,40"]
-|===
-|Flag |Env var |Default |Description
+`-log.format` / `LOG_FORMAT` (default: `text`)::
+Log format, either `text` or `json`
 
-|-log.format |LOG_FORMAT |text |Log format, either `text` or `json`
-|-log.level |LOG_LEVEL |info |Minimum log level to output (`debug`, `info`, `warn`, `error`)
-|===
+`-log.level` / `LOG_LEVEL` (default: `info`)::
+Minimum log level to output (`debug`, `info`, `warn`, `error`)
 
 == Allowed endpoints
 
-[cols="3,2"]
-|===
-|Endpoint(s) |Condition
+`GET /`::
+All GET requests are allowed
 
-|`GET /` |All GET requests are allowed
-|`POST /containers/+{id}+/kill` |Allowed only with permitted signals
-|`POST /images/create` |Allowed only if `-allowPulls` is enabled
-|`POST /{containers,images,networks,volumes,build}/prune` |Allowed only if `-allowPrune` is enabled
-|`POST /containers/+{id}+/attach` +
-`POST /containers/+{id}+/exec` +
-`POST /exec/+{id}+/start` +
-`POST /exec/+{id}+/resize`
-|Allowed only if `-allowExec` is enabled
-|`POST /containers/create` +
-`POST /containers/+{id}+/start` +
-`POST /containers/+{id}+/wait` +
-`DELETE /containers/+{id}+`
-|Allowed only if `-allowCreate` is enabled
-|All other requests (`POST`, `PUT`, `DELETE`, ...) |Denied
-|===
+`POST /containers/+{id}+/kill`::
+Allowed only with permitted signals
+
+`POST /images/create`::
+Allowed only if `-allowPulls` is enabled
+
+`POST /{containers,images,networks,volumes,build}/prune`::
+Allowed only if `-allowPrune` is enabled
+
+`POST /containers/+{id}+/attach`::
+`POST /containers/+{id}+/exec`::
+`POST /exec/+{id}+/start`::
+`POST /exec/+{id}+/resize`::
+Allowed only if `-allowExec` is enabled
+
+`POST /containers/create`::
+`POST /containers/+{id}+/start`::
+`POST /containers/+{id}+/wait`::
+`DELETE /containers/+{id}+`::
+Allowed only if `-allowCreate` is enabled
+
+All other requests (`POST`, `PUT`, `DELETE`, ...)::
+Denied
 
 Streaming endpoints (events, stats, logs, attach, archive, pulls, exec and the endpoints above) are not subject to the
 30 second server timeout.
